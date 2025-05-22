@@ -1,5 +1,5 @@
 let scene, camera, renderer, sphere, controls;
-let videoElement, cameraEnabled = false;
+let videoElement, cameraEnabled = false, gyroEnabled = false;
 let isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
 // Initialize the application
@@ -14,7 +14,7 @@ function setupScene() {
     scene = new THREE.Scene();
     
     // Create camera with extreme zoom range
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.01, 1000);
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.001, 1000);
     camera.position.set(0, 0, 0.3);
     
     // Create renderer
@@ -32,8 +32,8 @@ function setupScene() {
     controls.enableDamping = true;
     controls.dampingFactor = 0.25;
     controls.screenSpacePanning = false;
-    controls.minDistance = 0.02;  // Extreme close zoom
-    controls.maxDistance = 10;    // Far zoom
+    controls.minDistance = 0.002;  // 10x closer than before (0.02)
+    controls.maxDistance = 10;
     controls.enablePan = false;
     
     // Load 360 image
@@ -68,7 +68,7 @@ function setupScene() {
 
 function setupCameraFeed() {
     const cameraContainer = document.getElementById('cameraContainer');
-    cameraContainer.innerHTML = ''; // Clear previous video
+    cameraContainer.innerHTML = '';
     
     videoElement = document.createElement('video');
     videoElement.setAttribute('playsinline', '');
@@ -89,6 +89,7 @@ function setupCameraFeed() {
         videoElement.play();
         
         document.getElementById('transparencyControl').classList.remove('hidden');
+        document.getElementById('gyroToggle').classList.remove('hidden');
         document.getElementById('cameraToggle').textContent = '📷 Disable AR';
         cameraEnabled = true;
         
@@ -96,15 +97,53 @@ function setupCameraFeed() {
         document.getElementById('opacityControl').value = 0.8;
         document.getElementById('opacityValue').textContent = '80%';
         
-        // For mobile AR, use device orientation
-        if (isMobile) {
-            window.addEventListener('deviceorientation', handleOrientation);
+        if (isMobile && gyroEnabled) {
+            enableGyro();
         }
     }).catch(function(error) {
         console.error('Error accessing camera:', error);
         alert('Camera access is required for AR mode. Please enable camera permissions.');
         toggleCamera();
     });
+}
+
+function toggleGyro() {
+    gyroEnabled = !gyroEnabled;
+    document.getElementById('gyroToggle').textContent = gyroEnabled ? '🔄 Gyro On' : '🔄 Gyro Off';
+    
+    if (cameraEnabled && isMobile) {
+        if (gyroEnabled) {
+            enableGyro();
+        } else {
+            disableGyro();
+        }
+    }
+}
+
+function enableGyro() {
+    if (window.DeviceOrientationEvent) {
+        window.addEventListener('deviceorientation', handleOrientation);
+    }
+}
+
+function disableGyro() {
+    window.removeEventListener('deviceorientation', handleOrientation);
+    controls.reset();
+}
+
+function handleOrientation(event) {
+    if (!gyroEnabled || !cameraEnabled || !isMobile) return;
+    
+    const beta = event.beta ? THREE.MathUtils.degToRad(event.beta) : 0;
+    const gamma = event.gamma ? THREE.MathUtils.degToRad(event.gamma) : 0;
+    const alpha = event.alpha ? THREE.MathUtils.degToRad(event.alpha) : 0;
+    
+    camera.rotation.set(
+        Math.max(-Math.PI/2, Math.min(Math.PI/2, beta)), // Limit vertical rotation
+        alpha,
+        -gamma,
+        'YXZ'
+    );
 }
 
 function toggleCamera() {
@@ -114,12 +153,11 @@ function toggleCamera() {
         }
         document.getElementById('cameraContainer').innerHTML = '';
         
-        if (isMobile) {
-            window.removeEventListener('deviceorientation', handleOrientation);
-        }
+        disableGyro();
         
         document.getElementById('cameraToggle').textContent = '📷 Enable AR';
         document.getElementById('transparencyControl').classList.add('hidden');
+        document.getElementById('gyroToggle').classList.add('hidden');
         
         sphere.material.opacity = 1;
         cameraEnabled = false;
@@ -129,45 +167,14 @@ function toggleCamera() {
     }
 }
 
-function handleOrientation(event) {
-    if (!cameraEnabled || !isMobile) return;
-    
-    // Get device orientation in radians
-    const beta = event.beta ? THREE.MathUtils.degToRad(event.beta) : 0;
-    const gamma = event.gamma ? THREE.MathUtils.degToRad(event.gamma) : 0;
-    const alpha = event.alpha ? THREE.MathUtils.degToRad(event.alpha) : 0;
-    
-    // Apply rotation to camera
-    camera.rotation.set(beta, alpha, -gamma, 'YXZ');
-}
-
 function resetView() {
     camera.position.set(0, 0, 0.3);
     controls.reset();
 }
 
-function zoom(amount) {
-    const newDistance = controls.getDistance() * (amount > 0 ? 1.25 : 0.8);
-    if (newDistance >= controls.minDistance && newDistance <= controls.maxDistance) {
-        controls.dollyTo(newDistance, true);
-        showZoomFeedback(amount > 0 ? "Zooming Out" : "Zooming In");
-    }
-}
-
-function showZoomFeedback(message) {
-    const feedback = document.createElement('div');
-    feedback.className = 'zoom-feedback';
-    feedback.textContent = message;
-    document.getElementById('controls').appendChild(feedback);
-    
-    setTimeout(() => {
-        feedback.classList.add('fade-out');
-        setTimeout(() => feedback.remove(), 500);
-    }, 800);
-}
-
 function setupControls() {
     document.getElementById('cameraToggle').addEventListener('click', toggleCamera);
+    document.getElementById('gyroToggle').addEventListener('click', toggleGyro);
     
     document.getElementById('opacityControl').addEventListener('input', function(e) {
         if (cameraEnabled) {
@@ -179,27 +186,24 @@ function setupControls() {
     
     document.getElementById('resetView').addEventListener('click', resetView);
     
-    // Enhanced zoom controls
-    document.getElementById('zoomIn').addEventListener('click', () => zoom(-1));
-    document.getElementById('zoomOut').addEventListener('click', () => zoom(1));
-    
-    // Pinch-to-zoom for mobile
+    // Enhanced touch zoom
     if (isMobile) {
         let initialDistance = 0;
         
         renderer.domElement.addEventListener('touchstart', (e) => {
             if (e.touches.length === 2) {
                 initialDistance = getDistanceBetweenTouches(e);
+                e.preventDefault();
             }
         });
         
         renderer.domElement.addEventListener('touchmove', (e) => {
             if (e.touches.length === 2) {
-                e.preventDefault();
                 const currentDistance = getDistanceBetweenTouches(e);
-                const delta = initialDistance - currentDistance;
-                zoom(delta * 0.005);
+                const delta = (initialDistance - currentDistance) * 0.01;
+                controls.dolly(delta);
                 initialDistance = currentDistance;
+                e.preventDefault();
             }
         });
     }
@@ -219,7 +223,11 @@ function onWindowResize() {
 
 function animate() {
     requestAnimationFrame(animate);
-    controls.update();
+    
+    if (!gyroEnabled || !cameraEnabled || !isMobile) {
+        controls.update();
+    }
+    
     renderer.render(scene, camera);
 }
 

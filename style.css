@@ -185,6 +185,26 @@ canvas {
     transform: scale(1.5); /* Makes zoom appear closer */
 }
 
+.control-btn {
+    /* Existing styles */
+    position: relative;
+    z-index: 1000; /* Ensure buttons are above other elements */
+    touch-action: manipulation; /* Improve touch responsiveness */
+}
+
+#controls {
+    /* Existing styles */
+    pointer-events: auto; /* Ensure click events pass through */
+}
+
+#container {
+    /* Add this if not present */
+    pointer-events: none; /* Let clicks pass to controls */
+}
+
+#container > * {
+    pointer-events: auto; /* But keep children clickable */
+}
 
 @keyframes pulse {
     0% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7); }

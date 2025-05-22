@@ -1,24 +1,28 @@
 let scene, camera, renderer, sphere, controls;
 let videoElement, cameraEnabled = false, gyroEnabled = false;
 let isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-let initialBeta = null;
+let initialOrientation = null;
+let deviceOrientation = { alpha: 0, beta: 0, gamma: 0 };
+let screenOrientation = 0;
 
 // Initialize the application
 function init() {
     setupScene();
     setupControls();
     window.addEventListener('resize', onWindowResize);
+    
+    // iOS 13+ requires permission for device orientation
+    if (isMobile && typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        document.getElementById('gyroToggle').addEventListener('click', requestGyroPermission);
+    }
 }
 
 function setupScene() {
-    // Create scene
     scene = new THREE.Scene();
     
-    // Create camera with extreme zoom range
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.0001, 1000);
     camera.position.set(0, 0, 0.1);
     
-    // Create renderer
     renderer = new THREE.WebGLRenderer({ 
         antialias: true, 
         alpha: true,
@@ -28,12 +32,12 @@ function setupScene() {
     renderer.setPixelRatio(window.devicePixelRatio);
     document.getElementById('container').prepend(renderer.domElement);
     
-    // Enhanced orbit controls with extreme zoom
+    // Smoother controls
     controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.dampingFactor = 0.1; // Smoother rotation
+    controls.dampingFactor = 0.05;
     controls.screenSpacePanning = false;
-    controls.minDistance = 0.0005;  // Extreme close zoom
+    controls.minDistance = 0.0005;
     controls.maxDistance = 10;
     controls.enablePan = false;
     
@@ -43,18 +47,14 @@ function setupScene() {
         'images/Panorama7D6346.jpg',
         (texture) => {
             document.getElementById('loading').classList.add('hidden');
-            
-            // Create larger sphere for closer appearance
-            const geometry = new THREE.SphereGeometry(2, 64, 64); // Increased size
+            const geometry = new THREE.SphereGeometry(2, 64, 64);
             geometry.scale(-1, 1, 1);
             
-            const material = new THREE.MeshBasicMaterial({
+            sphere = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
                 map: texture,
                 transparent: true,
                 opacity: 1
-            });
-            
-            sphere = new THREE.Mesh(geometry, material);
+            }));
             scene.add(sphere);
         },
         undefined,
@@ -64,7 +64,24 @@ function setupScene() {
         }
     );
     
+    // Handle device orientation changes
+    window.addEventListener('orientationchange', () => {
+        screenOrientation = window.orientation || 0;
+    });
+    
     animate();
+}
+
+function requestGyroPermission() {
+    DeviceOrientationEvent.requestPermission()
+        .then(response => {
+            if (response === 'granted') {
+                toggleGyro();
+            } else {
+                alert('Gyroscope permission denied');
+            }
+        })
+        .catch(console.error);
 }
 
 function setupCameraFeed() {
@@ -108,65 +125,53 @@ function setupCameraFeed() {
 }
 
 function toggleGyro() {
-    gyroEnabled = !gyroEnabled;
-    
-    // Update button appearance
-    const gyroButton = document.getElementById('gyroToggle');
-    gyroButton.textContent = gyroEnabled ? '🔄 Gyro On' : '🔄 Gyro Off';
-    gyroButton.classList.toggle('gyro-on', gyroEnabled);
-    gyroButton.classList.toggle('gyro-off', !gyroEnabled);
-    
-    if (gyroEnabled) {
-        enableGyro();
-    } else {
-        disableGyro();
+    if (isMobile) {
+        gyroEnabled = !gyroEnabled;
+        
+        const gyroButton = document.getElementById('gyroToggle');
+        gyroButton.textContent = gyroEnabled ? '🔄 Gyro On' : '🔄 Gyro Off';
+        gyroButton.classList.toggle('gyro-on', gyroEnabled);
+        gyroButton.classList.toggle('gyro-off', !gyroEnabled);
+        
+        if (gyroEnabled) {
+            enableGyro();
+        } else {
+            disableGyro();
+        }
     }
 }
 
 function enableGyro() {
     if (!isMobile) return;
     
-    // Reset initial orientation
-    initialBeta = null;
-    
-    if (window.DeviceOrientationEvent) {
-        window.addEventListener('deviceorientation', handleOrientation);
-    }
-    
-    // Smooth transition to gyro control
-    controls.enableDamping = true;
+    initialOrientation = null;
+    window.addEventListener('deviceorientation', handleDeviceOrientation);
 }
 
 function disableGyro() {
     if (!isMobile) return;
     
-    window.removeEventListener('deviceorientation', handleOrientation);
-    controls.reset();
-    controls.enableDamping = true;
+    window.removeEventListener('deviceorientation', handleDeviceOrientation);
 }
 
-function handleOrientation(event) {
-    if (!gyroEnabled || !isMobile) return;
+function handleDeviceOrientation(event) {
+    if (!gyroEnabled) return;
     
-    const beta = event.beta ? THREE.MathUtils.degToRad(event.beta) : 0;
-    const gamma = event.gamma ? THREE.MathUtils.degToRad(event.gamma) : 0;
-    const alpha = event.alpha ? THREE.MathUtils.degToRad(event.alpha) : 0;
+    // Save raw orientation data
+    deviceOrientation = {
+        alpha: event.alpha ? THREE.MathUtils.degToRad(event.alpha) : 0,
+        beta: event.beta ? THREE.MathUtils.degToRad(event.beta) : 0,
+        gamma: event.gamma ? THREE.MathUtils.degToRad(event.gamma) : 0
+    };
     
-    // Set initial beta on first event
-    if (initialBeta === null) {
-        initialBeta = beta;
+    // Set initial orientation on first event
+    if (initialOrientation === null && event.alpha !== null) {
+        initialOrientation = {
+            alpha: deviceOrientation.alpha,
+            beta: deviceOrientation.beta,
+            gamma: deviceOrientation.gamma
+        };
     }
-    
-    // Calculate relative rotation from initial position
-    const relativeBeta = beta - initialBeta;
-    
-    // Apply rotation with limits
-    camera.rotation.set(
-        Math.max(-Math.PI/2, Math.min(Math.PI/2, relativeBeta)), // Limit vertical rotation
-        alpha,
-        -gamma,
-        'YXZ'
-    );
 }
 
 function toggleCamera() {
@@ -190,7 +195,7 @@ function toggleCamera() {
 function resetView() {
     camera.position.set(0, 0, 0.1);
     controls.reset();
-    initialBeta = null;
+    initialOrientation = null;
 }
 
 function setupControls() {
@@ -221,7 +226,7 @@ function setupControls() {
         renderer.domElement.addEventListener('touchmove', (e) => {
             if (e.touches.length === 2) {
                 const currentDistance = getDistanceBetweenTouches(e);
-                const delta = (initialDistance - currentDistance) * 0.002; // More sensitive zoom
+                const delta = (initialDistance - currentDistance) * 0.002;
                 controls.dolly(delta);
                 initialDistance = currentDistance;
                 e.preventDefault();
@@ -251,7 +256,25 @@ function onWindowResize() {
 function animate() {
     requestAnimationFrame(animate);
     
-    if (!gyroEnabled || !isMobile) {
+    // Combine gyro and manual rotation when gyro is enabled
+    if (gyroEnabled && initialOrientation !== null) {
+        // Calculate relative rotation from initial position
+        const relativeAlpha = deviceOrientation.alpha - initialOrientation.alpha;
+        const relativeBeta = deviceOrientation.beta - initialOrientation.beta;
+        const relativeGamma = deviceOrientation.gamma - initialOrientation.gamma;
+        
+        // Apply base rotation from gyro
+        camera.rotation.set(
+            Math.max(-Math.PI/2, Math.min(Math.PI/2, relativeBeta)), // Limit vertical rotation
+            relativeAlpha,
+            -relativeGamma,
+            'YXZ'
+        );
+        
+        // Apply additional rotation from controls
+        controls.update();
+    } else {
+        // Normal controls when gyro is off
         controls.update();
     }
     
@@ -259,3 +282,8 @@ function animate() {
 }
 
 window.addEventListener('load', init);
+
+// iOS 13+ device orientation permission
+if (isMobile) {
+    document.getElementById('gyroToggle').style.display = 'block';
+}

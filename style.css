@@ -164,3 +164,22 @@ body {
         gap: 6px;
     }
 }
+
+/* Previous styles remain, add these new rules: */
+
+.gyro-on {
+    background: #4CAF50 !important; /* Green when on */
+}
+
+.gyro-off {
+    background: #9E9E9E !important; /* Grey when off */
+}
+
+#gyroToggle {
+    transition: background 0.3s ease;
+}
+
+/* Make the sphere larger for closer zoom */
+canvas {
+    transform: scale(1.5); /* Makes zoom appear closer */
+}

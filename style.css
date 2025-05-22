@@ -129,6 +129,31 @@ body {
     margin-bottom: 5px;
 }
 
+#cameraContainer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    object-fit: cover;
+}
+
+#cameraContainer video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+#container {
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    z-index: 1;
+}
+
 @media (max-width: 480px) {
     .control-btn {
         padding: 10px 15px;

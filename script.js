@@ -1,6 +1,5 @@
 let scene, camera, renderer, sphere, controls;
-let videoElement, videoTexture, videoMesh;
-let cameraEnabled = false;
+let videoElement, cameraEnabled = false;
 let isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
 // Initialize the application
@@ -14,23 +13,27 @@ function setupScene() {
     // Create scene
     scene = new THREE.Scene();
     
-    // Create camera
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 0, 0.5);
+    // Create camera with extreme zoom range
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.01, 1000);
+    camera.position.set(0, 0, 0.3);
     
     // Create renderer
-    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer = new THREE.WebGLRenderer({ 
+        antialias: true, 
+        alpha: true,
+        powerPreference: "high-performance"
+    });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
     document.getElementById('container').prepend(renderer.domElement);
     
-    // Add orbit controls with enhanced zoom range
+    // Enhanced orbit controls with extreme zoom
     controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.25;
     controls.screenSpacePanning = false;
-    controls.minDistance = 0.05;  // Allows much closer zoom
-    controls.maxDistance = 5;     // Increased maximum zoom out
+    controls.minDistance = 0.02;  // Extreme close zoom
+    controls.maxDistance = 10;    // Far zoom
     controls.enablePan = false;
     
     // Load 360 image
@@ -38,7 +41,6 @@ function setupScene() {
     textureLoader.load(
         'images/Panorama7D6346.jpg',
         () => {
-            // Success callback - hide loading message
             document.getElementById('loading').classList.add('hidden');
         },
         undefined,
@@ -65,41 +67,28 @@ function setupScene() {
 }
 
 function setupCameraFeed() {
+    const cameraContainer = document.getElementById('cameraContainer');
+    cameraContainer.innerHTML = ''; // Clear previous video
+    
     videoElement = document.createElement('video');
     videoElement.setAttribute('playsinline', '');
     videoElement.setAttribute('webkit-playsinline', '');
-    
-    if (isMobile) {
-        window.addEventListener('deviceorientation', handleOrientation, true);
-    }
+    videoElement.style.width = '100%';
+    videoElement.style.height = '100%';
+    videoElement.style.objectFit = 'cover';
+    cameraContainer.appendChild(videoElement);
     
     navigator.mediaDevices.getUserMedia({ 
         video: { 
             facingMode: 'environment',
-            width: { ideal: window.innerWidth * window.devicePixelRatio },
-            height: { ideal: window.innerHeight * window.devicePixelRatio }
+            width: { ideal: 4096 },
+            height: { ideal: 2160 }
         } 
-    })
-    .then(function(stream) {
+    }).then(function(stream) {
         videoElement.srcObject = stream;
         videoElement.play();
         
-        videoTexture = new THREE.VideoTexture(videoElement);
-        videoTexture.minFilter = THREE.LinearFilter;
-        videoTexture.magFilter = THREE.LinearFilter;
-        
-        const videoGeometry = new THREE.PlaneGeometry(2, 2);
-        const videoMaterial = new THREE.MeshBasicMaterial({
-            map: videoTexture,
-            transparent: false
-        });
-        
-        videoMesh = new THREE.Mesh(videoGeometry, videoMaterial);
-        videoMesh.position.z = -1.5;
-        scene.add(videoMesh);
-        
         document.getElementById('transparencyControl').classList.remove('hidden');
-        document.getElementById('viewControls').classList.remove('hidden');
         document.getElementById('cameraToggle').textContent = '📷 Disable AR';
         cameraEnabled = true;
         
@@ -107,9 +96,11 @@ function setupCameraFeed() {
         document.getElementById('opacityControl').value = 0.8;
         document.getElementById('opacityValue').textContent = '80%';
         
-        controls.enabled = true;
-    })
-    .catch(function(error) {
+        // For mobile AR, use device orientation
+        if (isMobile) {
+            window.addEventListener('deviceorientation', handleOrientation);
+        }
+    }).catch(function(error) {
         console.error('Error accessing camera:', error);
         alert('Camera access is required for AR mode. Please enable camera permissions.');
         toggleCamera();
@@ -121,7 +112,8 @@ function toggleCamera() {
         if (videoElement && videoElement.srcObject) {
             videoElement.srcObject.getTracks().forEach(track => track.stop());
         }
-        if (videoMesh) scene.remove(videoMesh);
+        document.getElementById('cameraContainer').innerHTML = '';
+        
         if (isMobile) {
             window.removeEventListener('deviceorientation', handleOrientation);
         }
@@ -131,7 +123,6 @@ function toggleCamera() {
         
         sphere.material.opacity = 1;
         cameraEnabled = false;
-        controls.enabled = true;
         resetView();
     } else {
         setupCameraFeed();
@@ -141,23 +132,26 @@ function toggleCamera() {
 function handleOrientation(event) {
     if (!cameraEnabled || !isMobile) return;
     
+    // Get device orientation in radians
     const beta = event.beta ? THREE.MathUtils.degToRad(event.beta) : 0;
     const gamma = event.gamma ? THREE.MathUtils.degToRad(event.gamma) : 0;
     const alpha = event.alpha ? THREE.MathUtils.degToRad(event.alpha) : 0;
     
+    // Apply rotation to camera
     camera.rotation.set(beta, alpha, -gamma, 'YXZ');
 }
 
 function resetView() {
-    camera.position.set(0, 0, 0.5);
+    camera.position.set(0, 0, 0.3);
     controls.reset();
 }
 
 function zoom(amount) {
-    const newDistance = controls.getDistance() * (amount > 0 ? 1.2 : 0.8);
-    controls.dollyTo(newDistance, true);
-    controls.update();
-    showZoomFeedback(amount > 0 ? "Zooming Out" : "Zooming In");
+    const newDistance = controls.getDistance() * (amount > 0 ? 1.25 : 0.8);
+    if (newDistance >= controls.minDistance && newDistance <= controls.maxDistance) {
+        controls.dollyTo(newDistance, true);
+        showZoomFeedback(amount > 0 ? "Zooming Out" : "Zooming In");
+    }
 }
 
 function showZoomFeedback(message) {
@@ -173,11 +167,9 @@ function showZoomFeedback(message) {
 }
 
 function setupControls() {
-    const cameraToggle = document.getElementById('cameraToggle');
-    cameraToggle.addEventListener('click', toggleCamera);
+    document.getElementById('cameraToggle').addEventListener('click', toggleCamera);
     
-    const opacityControl = document.getElementById('opacityControl');
-    opacityControl.addEventListener('input', function(e) {
+    document.getElementById('opacityControl').addEventListener('input', function(e) {
         if (cameraEnabled) {
             const value = parseFloat(e.target.value);
             sphere.material.opacity = value;
@@ -186,15 +178,18 @@ function setupControls() {
     });
     
     document.getElementById('resetView').addEventListener('click', resetView);
+    
+    // Enhanced zoom controls
     document.getElementById('zoomIn').addEventListener('click', () => zoom(-1));
     document.getElementById('zoomOut').addEventListener('click', () => zoom(1));
     
+    // Pinch-to-zoom for mobile
     if (isMobile) {
-        let touchStartDistance = 0;
+        let initialDistance = 0;
         
         renderer.domElement.addEventListener('touchstart', (e) => {
             if (e.touches.length === 2) {
-                touchStartDistance = getDistanceBetweenTouches(e);
+                initialDistance = getDistanceBetweenTouches(e);
             }
         });
         
@@ -202,9 +197,9 @@ function setupControls() {
             if (e.touches.length === 2) {
                 e.preventDefault();
                 const currentDistance = getDistanceBetweenTouches(e);
-                const delta = (touchStartDistance - currentDistance) * 0.01;
-                zoom(delta);
-                touchStartDistance = currentDistance;
+                const delta = initialDistance - currentDistance;
+                zoom(delta * 0.005);
+                initialDistance = currentDistance;
             }
         });
     }
@@ -220,25 +215,11 @@ function onWindowResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
-    
-    if (videoMesh) {
-        videoMesh.scale.x = window.innerWidth / 500;
-        videoMesh.scale.y = window.innerHeight / 500;
-    }
 }
 
 function animate() {
     requestAnimationFrame(animate);
-    
-    if (controls) {
-        if (cameraEnabled && isMobile) {
-            controls.update();
-            controls.target.set(0, 0, 0);
-        } else {
-            controls.update();
-        }
-    }
-    
+    controls.update();
     renderer.render(scene, camera);
 }
 

@@ -165,7 +165,6 @@ body {
     }
 }
 
-/* Previous styles remain, add these new rules: */
 
 .gyro-on {
     background: #4CAF50 !important; /* Green when on */
@@ -182,4 +181,19 @@ body {
 /* Make the sphere larger for closer zoom */
 canvas {
     transform: scale(1.5); /* Makes zoom appear closer */
+}
+/* Gyro button states */
+.gyro-on {
+    background: #4CAF50 !important;
+    animation: pulse 2s infinite;
+}
+
+.gyro-off {
+    background: #9E9E9E !important;
+}
+
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(76, 175, 80, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
 }

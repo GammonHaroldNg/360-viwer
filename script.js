@@ -1,23 +1,22 @@
 let scene, camera, renderer, sphere, controls;
 let videoElement, cameraEnabled = false, gyroEnabled = false;
 let isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+let gyroQuaternion = new THREE.Quaternion();
+let deviceOrientation = {};
+let screenOrientation = 0;
 
-// Initialize the application
 function init() {
     setupScene();
     setupControls();
+    setupOrientationListeners();
     window.addEventListener('resize', onWindowResize);
 }
 
 function setupScene() {
-    // Create scene
     scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.0001, 1000);
+    camera.position.set(0, 0, 0.1);
     
-    // Create camera with extreme zoom range
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.001, 1000);
-    camera.position.set(0, 0, 0.3);
-    
-    // Create renderer
     renderer = new THREE.WebGLRenderer({ 
         antialias: true, 
         alpha: true,
@@ -27,192 +26,154 @@ function setupScene() {
     renderer.setPixelRatio(window.devicePixelRatio);
     document.getElementById('container').prepend(renderer.domElement);
     
-    // Enhanced orbit controls with extreme zoom
     controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.dampingFactor = 0.25;
-    controls.screenSpacePanning = false;
-    controls.minDistance = 0.002;  // 10x closer than before (0.02)
+    controls.dampingFactor = 0.05;
+    controls.minDistance = 0.0005;
     controls.maxDistance = 10;
-    controls.enablePan = false;
     
-    // Load 360 image
-    const textureLoader = new THREE.TextureLoader();
-    textureLoader.load(
-        'images/Panorama7D6346.jpg',
-        () => {
-            document.getElementById('loading').classList.add('hidden');
-        },
-        undefined,
-        (error) => {
-            console.error('Error loading image:', error);
-            document.getElementById('loading').textContent = 'Error loading image';
-        }
-    );
-    
-    const texture = new THREE.TextureLoader().load('images/Panorama7D6346.jpg');
-    const geometry = new THREE.SphereGeometry(1, 64, 64);
-    geometry.scale(-1, 1, 1);
-    
-    const material = new THREE.MeshBasicMaterial({
-        map: texture,
-        transparent: true,
-        opacity: 1
-    });
-    
-    sphere = new THREE.Mesh(geometry, material);
-    scene.add(sphere);
+    new THREE.TextureLoader().load('images/Panorama7D6346.jpg', (texture) => {
+        document.getElementById('loading').classList.add('hidden');
+        const geometry = new THREE.SphereGeometry(2, 64, 64).scale(-1, 1, 1);
+        sphere = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
+            map: texture,
+            transparent: true,
+            opacity: 1
+        }));
+        scene.add(sphere);
+    }, undefined, (err) => console.error(err));
     
     animate();
 }
 
-function setupCameraFeed() {
-    const cameraContainer = document.getElementById('cameraContainer');
-    cameraContainer.innerHTML = '';
+function setupControls() {
+    document.getElementById('cameraToggle').addEventListener('click', toggleCamera);
+    document.getElementById('gyroToggle').addEventListener('click', handleGyroToggle);
+    document.getElementById('resetView').addEventListener('click', resetView);
+    document.getElementById('opacityControl').addEventListener('input', updateOpacity);
     
-    videoElement = document.createElement('video');
-    videoElement.setAttribute('playsinline', '');
-    videoElement.setAttribute('webkit-playsinline', '');
-    videoElement.style.width = '100%';
-    videoElement.style.height = '100%';
-    videoElement.style.objectFit = 'cover';
-    cameraContainer.appendChild(videoElement);
-    
-    navigator.mediaDevices.getUserMedia({ 
-        video: { 
-            facingMode: 'environment',
-            width: { ideal: 4096 },
-            height: { ideal: 2160 }
-        } 
-    }).then(function(stream) {
-        videoElement.srcObject = stream;
-        videoElement.play();
-        
-        document.getElementById('transparencyControl').classList.remove('hidden');
-        document.getElementById('gyroToggle').classList.remove('hidden');
-        document.getElementById('cameraToggle').textContent = '📷 Disable AR';
-        cameraEnabled = true;
-        
-        sphere.material.opacity = 0.8;
-        document.getElementById('opacityControl').value = 0.8;
-        document.getElementById('opacityValue').textContent = '80%';
-        
-        if (isMobile && gyroEnabled) {
-            enableGyro();
-        }
-    }).catch(function(error) {
-        console.error('Error accessing camera:', error);
-        alert('Camera access is required for AR mode. Please enable camera permissions.');
-        toggleCamera();
-    });
+    if(isMobile) setupTouchControls();
 }
 
-function toggleGyro() {
-    gyroEnabled = !gyroEnabled;
-    document.getElementById('gyroToggle').textContent = gyroEnabled ? '🔄 Gyro On' : '🔄 Gyro Off';
-    
-    if (cameraEnabled && isMobile) {
-        if (gyroEnabled) {
-            enableGyro();
-        } else {
-            disableGyro();
-        }
+function setupOrientationListeners() {
+    window.addEventListener('orientationchange', () => screenOrientation = window.orientation || 0);
+    if(isMobile && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        document.getElementById('gyroToggle').addEventListener('click', requestGyroPermission);
     }
+}
+
+function handleGyroToggle() {
+    if(!isMobile) return;
+    gyroEnabled ? disableGyro() : enableGyro();
 }
 
 function enableGyro() {
-    if (window.DeviceOrientationEvent) {
-        window.addEventListener('deviceorientation', handleOrientation);
-    }
+    window.addEventListener('deviceorientation', handleDeviceOrientation);
+    gyroEnabled = true;
+    updateUI();
 }
 
 function disableGyro() {
-    window.removeEventListener('deviceorientation', handleOrientation);
+    window.removeEventListener('deviceorientation', handleDeviceOrientation);
+    gyroEnabled = false;
     controls.reset();
+    updateUI();
 }
 
-function handleOrientation(event) {
-    if (!gyroEnabled || !cameraEnabled || !isMobile) return;
+function handleDeviceOrientation(e) {
+    const alpha = e.alpha ? THREE.MathUtils.degToRad(e.alpha) : 0;
+    const beta = e.beta ? THREE.MathUtils.degToRad(e.beta) : 0;
+    const gamma = e.gamma ? THREE.MathUtils.degToRad(e.gamma) : 0;
     
-    const beta = event.beta ? THREE.MathUtils.degToRad(event.beta) : 0;
-    const gamma = event.gamma ? THREE.MathUtils.degToRad(event.gamma) : 0;
-    const alpha = event.alpha ? THREE.MathUtils.degToRad(event.alpha) : 0;
-    
-    camera.rotation.set(
-        Math.max(-Math.PI/2, Math.min(Math.PI/2, beta)), // Limit vertical rotation
+    gyroQuaternion.setFromEuler(new THREE.Euler(
+        Math.max(-Math.PI/2, Math.min(Math.PI/2, beta)),
         alpha,
         -gamma,
         'YXZ'
+    ));
+    
+    const orientationCorrection = new THREE.Quaternion().setFromEuler(
+        new THREE.Euler(0, 0, -THREE.MathUtils.degToRad(screenOrientation))
     );
+    gyroQuaternion.multiply(orientationCorrection);
+}
+
+async function requestGyroPermission() {
+    try {
+        const permission = await DeviceOrientationEvent.requestPermission();
+        if(permission === 'granted') enableGyro();
+    } catch(err) {
+        console.error('Gyro permission error:', err);
+    }
 }
 
 function toggleCamera() {
-    if (cameraEnabled) {
-        if (videoElement && videoElement.srcObject) {
-            videoElement.srcObject.getTracks().forEach(track => track.stop());
-        }
-        document.getElementById('cameraContainer').innerHTML = '';
-        
-        disableGyro();
-        
-        document.getElementById('cameraToggle').textContent = '📷 Enable AR';
-        document.getElementById('transparencyControl').classList.add('hidden');
-        document.getElementById('gyroToggle').classList.add('hidden');
-        
-        sphere.material.opacity = 1;
-        cameraEnabled = false;
-        resetView();
-    } else {
-        setupCameraFeed();
+    cameraEnabled ? disableCamera() : enableCamera();
+    updateUI();
+}
+
+function enableCamera() {
+    const cameraContainer = document.getElementById('cameraContainer');
+    videoElement = document.createElement('video');
+    videoElement.setAttribute('playsinline', '');
+    cameraContainer.appendChild(videoElement);
+    
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }})
+        .then(stream => {
+            videoElement.srcObject = stream;
+            videoElement.play();
+            cameraEnabled = true;
+            updateUI();
+        })
+        .catch(err => alert('Camera error: ' + err.message));
+}
+
+function disableCamera() {
+    if(videoElement?.srcObject) videoElement.srcObject.getTracks().forEach(t => t.stop());
+    document.getElementById('cameraContainer').innerHTML = '';
+    cameraEnabled = false;
+    updateUI();
+}
+
+function updateOpacity(e) {
+    if(cameraEnabled) {
+        const value = parseFloat(e.target.value);
+        sphere.material.opacity = value;
+        document.getElementById('opacityValue').textContent = `${Math.round(value * 100)}%`;
     }
 }
 
 function resetView() {
-    camera.position.set(0, 0, 0.3);
+    camera.position.set(0, 0, 0.1);
     controls.reset();
 }
 
-function setupControls() {
-    document.getElementById('cameraToggle').addEventListener('click', toggleCamera);
-    document.getElementById('gyroToggle').addEventListener('click', toggleGyro);
+function setupTouchControls() {
+    let touchStartDistance = 0;
     
-    document.getElementById('opacityControl').addEventListener('input', function(e) {
-        if (cameraEnabled) {
-            const value = parseFloat(e.target.value);
-            sphere.material.opacity = value;
-            document.getElementById('opacityValue').textContent = `${Math.round(value * 100)}%`;
-        }
+    renderer.domElement.addEventListener('touchstart', e => {
+        if(e.touches.length === 2) touchStartDistance = getTouchDistance(e);
     });
     
-    document.getElementById('resetView').addEventListener('click', resetView);
-    
-    // Enhanced touch zoom
-    if (isMobile) {
-        let initialDistance = 0;
-        
-        renderer.domElement.addEventListener('touchstart', (e) => {
-            if (e.touches.length === 2) {
-                initialDistance = getDistanceBetweenTouches(e);
-                e.preventDefault();
-            }
-        });
-        
-        renderer.domElement.addEventListener('touchmove', (e) => {
-            if (e.touches.length === 2) {
-                const currentDistance = getDistanceBetweenTouches(e);
-                const delta = (initialDistance - currentDistance) * 0.01;
-                controls.dolly(delta);
-                initialDistance = currentDistance;
-                e.preventDefault();
-            }
-        });
-    }
+    renderer.domElement.addEventListener('touchmove', e => {
+        if(e.touches.length === 2) {
+            const delta = (touchStartDistance - getTouchDistance(e)) * 0.002;
+            controls.dolly(delta);
+            touchStartDistance = getTouchDistance(e);
+        }
+    });
 }
 
-function getDistanceBetweenTouches(e) {
-    const dx = e.touches[0].clientX - e.touches[1].clientX;
-    const dy = e.touches[0].clientY - e.touches[1].clientY;
-    return Math.sqrt(dx * dx + dy * dy);
+function getTouchDistance(e) {
+    const [a, b] = e.touches;
+    return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+}
+
+function updateUI() {
+    document.getElementById('cameraToggle').textContent = cameraEnabled ? '📷 Disable AR' : '📷 Enable AR';
+    document.getElementById('gyroToggle').textContent = gyroEnabled ? '🔄 Gyro On' : '🔄 Gyro Off';
+    document.getElementById('gyroToggle').className = `control-btn ${gyroEnabled ? 'gyro-on' : 'gyro-off'}`;
+    document.getElementById('transparencyControl').classList.toggle('hidden', !cameraEnabled);
 }
 
 function onWindowResize() {
@@ -223,11 +184,8 @@ function onWindowResize() {
 
 function animate() {
     requestAnimationFrame(animate);
-    
-    if (!gyroEnabled || !cameraEnabled || !isMobile) {
-        controls.update();
-    }
-    
+    if(gyroEnabled) camera.quaternion.copy(gyroQuaternion);
+    controls.update();
     renderer.render(scene, camera);
 }
 

@@ -8,12 +8,6 @@ function init() {
     setupScene();
     setupControls();
     window.addEventListener('resize', onWindowResize);
-    
-    // Hide loading when image is loaded
-    const textureLoader = new THREE.TextureLoader();
-    textureLoader.load('images/Panorama_7D6346.jpg', () => {
-        document.getElementById('loading').classList.add('hidden');
-    });
 }
 
 function setupScene() {
@@ -30,16 +24,30 @@ function setupScene() {
     renderer.setPixelRatio(window.devicePixelRatio);
     document.getElementById('container').prepend(renderer.domElement);
     
-    // Add orbit controls for desktop
+    // Add orbit controls
     controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.25;
     controls.screenSpacePanning = false;
-    controls.minDistance = 0.3;
-    controls.maxDistance = 2;
+    controls.minDistance = 0.1;  // Allows closer zoom
+    controls.maxDistance = 3;    // Maximum zoom out distance
     controls.enablePan = false;
     
-    // Load 360 image
+    // Load 360 image (name without space)
+    const textureLoader = new THREE.TextureLoader();
+    textureLoader.load(
+        'images/Panorama7D6346.jpg',
+        () => {
+            // Success callback - hide loading message
+            document.getElementById('loading').classList.add('hidden');
+        },
+        undefined, // Progress callback
+        (error) => {
+            console.error('Error loading image:', error);
+            document.getElementById('loading').textContent = 'Error loading image';
+        }
+    );
+    
     const texture = new THREE.TextureLoader().load('images/Panorama7D6346.jpg');
     const geometry = new THREE.SphereGeometry(1, 64, 64);
     geometry.scale(-1, 1, 1); // Flip inside out
@@ -70,8 +78,8 @@ function setupCameraFeed() {
     navigator.mediaDevices.getUserMedia({ 
         video: { 
             facingMode: 'environment',
-            width: { ideal: 1920 },
-            height: { ideal: 1080 }
+            width: { ideal: window.innerWidth * window.devicePixelRatio },
+            height: { ideal: window.innerHeight * window.devicePixelRatio }
         } 
     })
     .then(function(stream) {
@@ -106,8 +114,8 @@ function setupCameraFeed() {
         document.getElementById('opacityControl').value = 0.8;
         document.getElementById('opacityValue').textContent = '80%';
         
-        // Disable orbit controls when camera is on
-        controls.enabled = false;
+        // Keep controls enabled in AR mode
+        controls.enabled = true;
     })
     .catch(function(error) {
         console.error('Error accessing camera:', error);
@@ -129,13 +137,12 @@ function toggleCamera() {
         
         document.getElementById('cameraToggle').textContent = '📷 Enable AR';
         document.getElementById('transparencyControl').classList.add('hidden');
-        document.getElementById('viewControls').classList.add('hidden');
         
         // Reset image to fully opaque
         sphere.material.opacity = 1;
         cameraEnabled = false;
         
-        // Re-enable orbit controls
+        // Keep controls enabled
         controls.enabled = true;
         resetView();
     } else {
@@ -160,8 +167,6 @@ function resetView() {
 }
 
 function zoom(amount) {
-    if (cameraEnabled) return;
-    
     const newDistance = controls.getDistance() + amount;
     if (newDistance >= controls.minDistance && newDistance <= controls.maxDistance) {
         controls.dolly(amount);
@@ -196,7 +201,7 @@ function setupControls() {
         });
         
         document.addEventListener('touchmove', (e) => {
-            if (e.touches.length === 2 && !cameraEnabled) {
+            if (e.touches.length === 2) {
                 e.preventDefault();
                 const currentDistance = getDistanceBetweenTouches(e);
                 const delta = (touchStartDistance - currentDistance) * 0.01;
@@ -217,13 +222,25 @@ function onWindowResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+    
+    if (videoMesh) {
+        videoMesh.scale.x = window.innerWidth / 500;
+        videoMesh.scale.y = window.innerHeight / 500;
+    }
 }
 
 function animate() {
     requestAnimationFrame(animate);
     
-    if (controls && controls.enabled) {
-        controls.update();
+    if (controls) {
+        if (cameraEnabled && isMobile) {
+            // For mobile AR, dampen the controls
+            controls.update();
+            controls.target.set(0, 0, 0);
+        } else {
+            // Normal controls
+            controls.update();
+        }
     }
     
     renderer.render(scene, camera);

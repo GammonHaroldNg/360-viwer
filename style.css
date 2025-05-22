@@ -166,12 +166,14 @@ body {
 }
 
 
+/* Gyro button states */
 .gyro-on {
-    background: #4CAF50 !important; /* Green when on */
+    background: #4CAF50 !important;
+    animation: pulse 2s infinite;
 }
 
 .gyro-off {
-    background: #9E9E9E !important; /* Grey when off */
+    background: #9E9E9E !important;
 }
 
 #gyroToggle {
@@ -182,15 +184,7 @@ body {
 canvas {
     transform: scale(1.5); /* Makes zoom appear closer */
 }
-/* Gyro button states */
-.gyro-on {
-    background: #4CAF50 !important;
-    animation: pulse 2s infinite;
-}
 
-.gyro-off {
-    background: #9E9E9E !important;
-}
 
 @keyframes pulse {
     0% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7); }

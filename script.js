@@ -33,7 +33,7 @@ function setupScene() {
     document.getElementById('container').prepend(renderer.domElement);
     
     // Load 360 image
-    const texture = new THREE.TextureLoader().load('images/Panorama7D6346.jpg');
+    const texture = new THREE.TextureLoader().load('images/Panorama 7D6346.jpg');
     const geometry = new THREE.SphereGeometry(500, 60, 40);
     geometry.scale(-1, 1, 1); // Flip inside out
     

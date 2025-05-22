@@ -24,16 +24,16 @@ function setupScene() {
     renderer.setPixelRatio(window.devicePixelRatio);
     document.getElementById('container').prepend(renderer.domElement);
     
-    // Add orbit controls
+    // Add orbit controls with enhanced zoom range
     controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.25;
     controls.screenSpacePanning = false;
-    controls.minDistance = 0.1;  // Allows closer zoom
-    controls.maxDistance = 3;    // Maximum zoom out distance
+    controls.minDistance = 0.05;  // Allows much closer zoom
+    controls.maxDistance = 5;     // Increased maximum zoom out
     controls.enablePan = false;
     
-    // Load 360 image (name without space)
+    // Load 360 image
     const textureLoader = new THREE.TextureLoader();
     textureLoader.load(
         'images/Panorama7D6346.jpg',
@@ -41,7 +41,7 @@ function setupScene() {
             // Success callback - hide loading message
             document.getElementById('loading').classList.add('hidden');
         },
-        undefined, // Progress callback
+        undefined,
         (error) => {
             console.error('Error loading image:', error);
             document.getElementById('loading').textContent = 'Error loading image';
@@ -50,18 +50,17 @@ function setupScene() {
     
     const texture = new THREE.TextureLoader().load('images/Panorama7D6346.jpg');
     const geometry = new THREE.SphereGeometry(1, 64, 64);
-    geometry.scale(-1, 1, 1); // Flip inside out
+    geometry.scale(-1, 1, 1);
     
     const material = new THREE.MeshBasicMaterial({
         map: texture,
         transparent: true,
-        opacity: 1 // Start fully visible
+        opacity: 1
     });
     
     sphere = new THREE.Mesh(geometry, material);
     scene.add(sphere);
     
-    // Start animation loop
     animate();
 }
 
@@ -70,7 +69,6 @@ function setupCameraFeed() {
     videoElement.setAttribute('playsinline', '');
     videoElement.setAttribute('webkit-playsinline', '');
     
-    // Get device orientation if mobile
     if (isMobile) {
         window.addEventListener('deviceorientation', handleOrientation, true);
     }
@@ -86,13 +84,10 @@ function setupCameraFeed() {
         videoElement.srcObject = stream;
         videoElement.play();
         
-        // Create camera texture
         videoTexture = new THREE.VideoTexture(videoElement);
         videoTexture.minFilter = THREE.LinearFilter;
         videoTexture.magFilter = THREE.LinearFilter;
-        videoTexture.format = THREE.RGBFormat;
         
-        // Create camera background plane
         const videoGeometry = new THREE.PlaneGeometry(2, 2);
         const videoMaterial = new THREE.MeshBasicMaterial({
             map: videoTexture,
@@ -103,18 +98,15 @@ function setupCameraFeed() {
         videoMesh.position.z = -1.5;
         scene.add(videoMesh);
         
-        // Update UI
         document.getElementById('transparencyControl').classList.remove('hidden');
         document.getElementById('viewControls').classList.remove('hidden');
         document.getElementById('cameraToggle').textContent = '📷 Disable AR';
         cameraEnabled = true;
         
-        // Set initial transparency to 80%
         sphere.material.opacity = 0.8;
         document.getElementById('opacityControl').value = 0.8;
         document.getElementById('opacityValue').textContent = '80%';
         
-        // Keep controls enabled in AR mode
         controls.enabled = true;
     })
     .catch(function(error) {
@@ -126,7 +118,6 @@ function setupCameraFeed() {
 
 function toggleCamera() {
     if (cameraEnabled) {
-        // Disable camera
         if (videoElement && videoElement.srcObject) {
             videoElement.srcObject.getTracks().forEach(track => track.stop());
         }
@@ -138,11 +129,8 @@ function toggleCamera() {
         document.getElementById('cameraToggle').textContent = '📷 Enable AR';
         document.getElementById('transparencyControl').classList.add('hidden');
         
-        // Reset image to fully opaque
         sphere.material.opacity = 1;
         cameraEnabled = false;
-        
-        // Keep controls enabled
         controls.enabled = true;
         resetView();
     } else {
@@ -153,7 +141,6 @@ function toggleCamera() {
 function handleOrientation(event) {
     if (!cameraEnabled || !isMobile) return;
     
-    // Get device orientation and adjust camera
     const beta = event.beta ? THREE.MathUtils.degToRad(event.beta) : 0;
     const gamma = event.gamma ? THREE.MathUtils.degToRad(event.gamma) : 0;
     const alpha = event.alpha ? THREE.MathUtils.degToRad(event.alpha) : 0;
@@ -167,10 +154,22 @@ function resetView() {
 }
 
 function zoom(amount) {
-    const newDistance = controls.getDistance() + amount;
-    if (newDistance >= controls.minDistance && newDistance <= controls.maxDistance) {
-        controls.dolly(amount);
-    }
+    const newDistance = controls.getDistance() * (amount > 0 ? 1.2 : 0.8);
+    controls.dollyTo(newDistance, true);
+    controls.update();
+    showZoomFeedback(amount > 0 ? "Zooming Out" : "Zooming In");
+}
+
+function showZoomFeedback(message) {
+    const feedback = document.createElement('div');
+    feedback.className = 'zoom-feedback';
+    feedback.textContent = message;
+    document.getElementById('controls').appendChild(feedback);
+    
+    setTimeout(() => {
+        feedback.classList.add('fade-out');
+        setTimeout(() => feedback.remove(), 500);
+    }, 800);
 }
 
 function setupControls() {
@@ -187,20 +186,19 @@ function setupControls() {
     });
     
     document.getElementById('resetView').addEventListener('click', resetView);
-    document.getElementById('zoomIn').addEventListener('click', () => zoom(-0.1));
-    document.getElementById('zoomOut').addEventListener('click', () => zoom(0.1));
+    document.getElementById('zoomIn').addEventListener('click', () => zoom(-1));
+    document.getElementById('zoomOut').addEventListener('click', () => zoom(1));
     
-    // Add touch events for mobile
     if (isMobile) {
         let touchStartDistance = 0;
         
-        document.addEventListener('touchstart', (e) => {
+        renderer.domElement.addEventListener('touchstart', (e) => {
             if (e.touches.length === 2) {
                 touchStartDistance = getDistanceBetweenTouches(e);
             }
         });
         
-        document.addEventListener('touchmove', (e) => {
+        renderer.domElement.addEventListener('touchmove', (e) => {
             if (e.touches.length === 2) {
                 e.preventDefault();
                 const currentDistance = getDistanceBetweenTouches(e);
@@ -234,11 +232,9 @@ function animate() {
     
     if (controls) {
         if (cameraEnabled && isMobile) {
-            // For mobile AR, dampen the controls
             controls.update();
             controls.target.set(0, 0, 0);
         } else {
-            // Normal controls
             controls.update();
         }
     }
@@ -246,5 +242,4 @@ function animate() {
     renderer.render(scene, camera);
 }
 
-// Start the application
 window.addEventListener('load', init);

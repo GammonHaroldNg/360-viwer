@@ -17,19 +17,16 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Setup Pages
         uses: actions/configure-pages@v3
 
-      - name: Build (empty step - no build needed for static files)
-        run: echo "No build step required for static files"
-
-      - name: Upload artifact
+      - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v2
         with:
-          path: '.'  # Uploads entire repository root
+          path: '.'
 
       - name: Deploy to GitHub Pages
         id: deployment

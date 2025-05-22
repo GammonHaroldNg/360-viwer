@@ -12,16 +12,13 @@
     <div id="container">
         <div id="controls">
             <button id="cameraToggle" class="control-btn">📷 Enable AR</button>
+            <button id="gyroToggle" class="control-btn hidden">🔄 Gyro Off</button>
             <div id="transparencyControl" class="hidden">
                 <input type="range" id="opacityControl" min="0" max="1" step="0.01" value="0.8">
                 <span id="opacityValue">80%</span>
             </div>
             <div id="viewControls">
                 <button id="resetView" class="control-btn" title="Reset View">⟲ Reset</button>
-                <div class="zoom-controls">
-                    <button id="zoomIn" class="control-btn" title="Zoom In">+</button>
-                    <button id="zoomOut" class="control-btn" title="Zoom Out">-</button>
-                </div>
             </div>
         </div>
         <div id="loading">Loading 360° image...</div>

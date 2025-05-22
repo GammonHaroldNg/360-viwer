@@ -39,6 +39,7 @@ body {
     cursor: pointer;
     min-width: 120px;
     text-align: center;
+    position: relative;
 }
 
 .control-btn:hover {
@@ -93,6 +94,39 @@ body {
 
 .hidden {
     display: none !important;
+}
+
+.zoom-feedback {
+    position: absolute;
+    top: -30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 14px;
+    opacity: 1;
+    transition: opacity 0.5s;
+}
+
+.zoom-feedback.fade-out {
+    opacity: 0;
+}
+
+.control-btn[title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #333;
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    white-space: nowrap;
+    margin-bottom: 5px;
 }
 
 @media (max-width: 480px) {

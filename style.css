@@ -22,10 +22,10 @@ body {
     transform: translateX(-50%);
     display: flex;
     gap: 10px;
-    background: rgba(0, 0, 0, 0.7);
     padding: 12px;
     border-radius: 25px;
     backdrop-filter: blur(10px);
+    background: rgba(0, 0, 0, 0.5);
     z-index: 1000;
     flex-wrap: wrap;
     justify-content: center;
@@ -33,9 +33,8 @@ body {
 
 .control-btn {
     padding: 12px 24px;
-    border: none;
+    border: 2px solid transparent;
     border-radius: 25px;
-    background: #4285f4;
     color: white;
     font-size: 14px;
     cursor: pointer;
@@ -43,10 +42,33 @@ body {
     flex-shrink: 0;
 }
 
-.control-btn:hover {
-    background: #3367d6;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+.ar-inactive {
+    background: #666;
+    border-color: #4285f4;
+}
+
+.ar-active {
+    background: #4285f4;
+    border-color: #3367d6;
+}
+
+.gyro-inactive {
+    background: #666;
+    border-color: #4CAF50;
+}
+
+.gyro-active {
+    background: #4CAF50;
+    border-color: #45a049;
+}
+
+#resetView {
+    background: #666;
+    border-color: #888;
+}
+
+#resetView:hover {
+    background: #555;
 }
 
 #transparencyControl {
@@ -76,16 +98,11 @@ body {
     transition: transform 0.2s ease;
 }
 
-#opacitySlider::-webkit-slider-thumb:hover {
-    transform: scale(1.2);
-}
-
 #opacityValue {
     color: white;
     font-weight: bold;
     min-width: 40px;
     text-align: center;
-    transition: transform 0.2s ease;
 }
 
 #loading {
@@ -118,29 +135,6 @@ body {
     transform: scaleX(-1);
 }
 
-.gyro-on {
-    background: #4CAF50 !important;
-    animation: pulse 1.5s infinite;
-}
-
-.gyro-off {
-    background: #666 !important;
-}
-
-#resetView {
-    background: #666;
-}
-
-#resetView:hover {
-    background: #555;
-}
-
-@keyframes pulse {
-    0% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.4); }
-    70% { box-shadow: 0 0 0 12px rgba(76, 175, 80, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
-}
-
 @media (max-width: 768px) {
     #controls {
         bottom: 10px;
@@ -151,21 +145,5 @@ body {
     .control-btn {
         padding: 10px 18px;
         font-size: 13px;
-    }
-    
-    #opacitySlider {
-        width: 100px;
-    }
-}
-
-@media (max-width: 480px) {
-    #controls {
-        width: 90%;
-        justify-content: space-around;
-    }
-    
-    .control-btn {
-        flex-grow: 1;
-        text-align: center;
     }
 }

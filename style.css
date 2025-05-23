@@ -1,8 +1,10 @@
+/* style.css */
 body {
     margin: 0;
     overflow: hidden;
     font-family: Arial, sans-serif;
     touch-action: none;
+    background: #000;
 }
 
 #container {
@@ -19,10 +21,14 @@ body {
     left: 50%;
     transform: translateX(-50%);
     display: flex;
-    flex-direction: column;
-    align-items: center;
     gap: 10px;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 12px;
+    border-radius: 25px;
+    backdrop-filter: blur(10px);
     z-index: 1000;
+    flex-wrap: wrap;
+    justify-content: center;
 }
 
 .control-btn {
@@ -31,32 +37,33 @@ body {
     border-radius: 25px;
     background: #4285f4;
     color: white;
-    font-size: 16px;
+    font-size: 14px;
     cursor: pointer;
     transition: all 0.3s ease;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    flex-shrink: 0;
 }
 
 .control-btn:hover {
     background: #3367d6;
     transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
 }
 
 #transparencyControl {
     display: flex;
     align-items: center;
     gap: 12px;
-    background: rgba(255, 255, 255, 0.9);
     padding: 8px 16px;
     border-radius: 25px;
-    backdrop-filter: blur(5px);
+    background: rgba(255, 255, 255, 0.1);
 }
 
 #opacitySlider {
     width: 120px;
     height: 4px;
-    background: rgba(0, 0, 0, 0.1);
+    background: rgba(255, 255, 255, 0.2);
     border-radius: 2px;
+    -webkit-appearance: none;
 }
 
 #opacitySlider::-webkit-slider-thumb {
@@ -66,13 +73,19 @@ body {
     border-radius: 50%;
     background: #4285f4;
     cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+#opacitySlider::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
 }
 
 #opacityValue {
+    color: white;
     font-weight: bold;
-    color: #333;
     min-width: 40px;
     text-align: center;
+    transition: transform 0.2s ease;
 }
 
 #loading {
@@ -105,9 +118,13 @@ body {
     transform: scaleX(-1);
 }
 
-#controls {
-    flex-wrap: wrap;
-    gap: 8px;
+.gyro-on {
+    background: #4CAF50 !important;
+    animation: pulse 1.5s infinite;
+}
+
+.gyro-off {
+    background: #666 !important;
 }
 
 #resetView {
@@ -118,10 +135,37 @@ body {
     background: #555;
 }
 
-.gyro-on {
-    background: #4CAF50 !important;
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.4); }
+    70% { box-shadow: 0 0 0 12px rgba(76, 175, 80, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
 }
 
-.gyro-off {
-    background: #666 !important;
+@media (max-width: 768px) {
+    #controls {
+        bottom: 10px;
+        padding: 8px;
+        gap: 8px;
+    }
+    
+    .control-btn {
+        padding: 10px 18px;
+        font-size: 13px;
+    }
+    
+    #opacitySlider {
+        width: 100px;
+    }
+}
+
+@media (max-width: 480px) {
+    #controls {
+        width: 90%;
+        justify-content: space-around;
+    }
+    
+    .control-btn {
+        flex-grow: 1;
+        text-align: center;
+    }
 }

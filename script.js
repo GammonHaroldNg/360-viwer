@@ -1,27 +1,24 @@
-// script.js (corrected version)
+// script.js
 let scene, camera, renderer, sphere, controls;
-let videoElement, videoStream = null;
+let videoStream = null;
 let arEnabled = false, gyroEnabled = false;
 let isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 let gyroQuaternion = new THREE.Quaternion();
-let initialCameraPosition = new THREE.Vector3(0, 0, 0.1);
-let initialCameraRotation = new THREE.Euler();
+let initialPosition = new THREE.Vector3(0, 0, 0.1);
 
 async function init() {
     setupScene();
     setupControls();
-    setupGyro(); // Now properly defined
+    setupGyro();
     window.addEventListener('resize', onWindowResize);
-    storeInitialView();
     animate();
 }
 
 function setupScene() {
     scene = new THREE.Scene();
-    
     camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-    camera.position.copy(initialCameraPosition);
-    camera.rotation.x = -0.5;
+    camera.position.copy(initialPosition);
+    camera.rotation.x = -0.5; // Look at horizon
 
     renderer = new THREE.WebGLRenderer({
         antialias: true,
@@ -31,25 +28,19 @@ function setupScene() {
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.getElementById('container').appendChild(renderer.domElement);
 
-    // Proper sphere creation with error handling
-    new THREE.TextureLoader().load(
-        'images/Panorama7D6346.jpg',
-        texture => {
-            const geometry = new THREE.SphereGeometry(5, 64, 64).scale(-1, 1, 1);
-            sphere = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
-                map: texture,
-                transparent: true,
-                opacity: 1
-            }));
-            scene.add(sphere);
-            document.getElementById('loading').remove();
-        },
-        undefined,
-        err => {
-            console.error('Failed to load texture:', err);
-            document.getElementById('loading').textContent = 'Error loading image';
-        }
-    );
+    // Load 360 image
+    new THREE.TextureLoader().load('images/Panorama7D6346.jpg', texture => {
+        const geometry = new THREE.SphereGeometry(5, 64, 64).scale(-1, 1, 1);
+        sphere = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
+            map: texture,
+            transparent: true
+        }));
+        scene.add(sphere);
+        document.getElementById('loading').remove();
+    }, undefined, err => {
+        console.error('Image load error:', err);
+        document.getElementById('loading').textContent = 'Failed to load image';
+    });
 
     controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
@@ -58,32 +49,36 @@ function setupScene() {
     controls.maxDistance = 10;
 }
 
-// Add missing gyro functions
+function setupControls() {
+    document.getElementById('arToggle').addEventListener('click', toggleAR);
+    document.getElementById('gyroToggle').addEventListener('click', toggleGyro);
+    document.getElementById('resetView').addEventListener('click', () => {
+        camera.position.copy(initialPosition);
+        controls.reset();
+    });
+    document.getElementById('opacitySlider').addEventListener('input', e => {
+        if(sphere) sphere.material.opacity = e.target.value;
+        document.getElementById('opacityValue').textContent = `${Math.round(e.target.value * 100)}%`;
+    });
+}
+
 function setupGyro() {
     if(!isMobile) return;
     
-    window.addEventListener('deviceorientation', handleDeviceOrientation);
-}
-
-function handleDeviceOrientation(event) {
-    if(!gyroEnabled || !event.alpha) return;
-    
-    const alpha = THREE.MathUtils.degToRad(event.alpha);
-    const beta = THREE.MathUtils.degToRad(event.beta);
-    const gamma = THREE.MathUtils.degToRad(event.gamma);
-    
-    gyroQuaternion.setFromEuler(new THREE.Euler(
-        Math.max(-Math.PI/2, Math.min(Math.PI/2, beta)),
-        alpha,
-        -gamma,
-        'YXZ'
-    ));
-}
-
-function disableGyro() {
-    gyroEnabled = false;
-    controls.enabled = true;
-    updateButtonStates();
+    window.addEventListener('deviceorientation', event => {
+        if(!gyroEnabled || !event.alpha) return;
+        
+        const alpha = THREE.MathUtils.degToRad(event.alpha);
+        const beta = THREE.MathUtils.degToRad(event.beta);
+        const gamma = THREE.MathUtils.degToRad(event.gamma);
+        
+        gyroQuaternion.setFromEuler(new THREE.Euler(
+            Math.max(-Math.PI/2, Math.min(Math.PI/2, beta)),
+            alpha,
+            -gamma,
+            'YXZ'
+        ));
+    });
 }
 
 async function toggleAR() {
@@ -91,9 +86,20 @@ async function toggleAR() {
         arEnabled = !arEnabled;
         
         if(arEnabled) {
-            await enableCamera();
+            videoStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment' }
+            });
+            
+            const video = document.createElement('video');
+            video.srcObject = videoStream;
+            video.playsInline = true;
+            video.style.cssText = `position:fixed;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);`;
+            document.getElementById('cameraContainer').appendChild(video);
+            await video.play();
+            
             if(sphere) sphere.material.opacity = 0.8;
             document.getElementById('transparencyControl').classList.remove('hidden');
+            
             if(isMobile) {
                 gyroEnabled = true;
                 controls.enabled = false;
@@ -102,33 +108,55 @@ async function toggleAR() {
                 }
             }
         } else {
-            disableCamera();
+            if(videoStream) videoStream.getTracks().forEach(t => t.stop());
+            document.getElementById('cameraContainer').innerHTML = '';
             if(sphere) sphere.material.opacity = 1;
             document.getElementById('transparencyControl').classList.add('hidden');
-            disableGyro();
+            gyroEnabled = false;
+            controls.enabled = true;
         }
         
-        updateButtonStates();
+        updateUI();
     } catch(error) {
-        console.error('AR toggle error:', error);
+        console.error('AR error:', error);
         alert(`Error: ${error.message}`);
     }
 }
 
-// Rest of the functions remain the same as previous answer
-// (setupControls, enableCamera, disableCamera, updateOpacity, etc.)
+function toggleGyro() {
+    if(!isMobile || arEnabled) return;
+    
+    gyroEnabled = !gyroEnabled;
+    controls.enabled = !gyroEnabled;
+    updateUI();
+}
 
-// Make sure all functions are properly defined
-function updateButtonStates() {
-    const arButton = document.getElementById('arToggle');
-    arButton.classList.toggle('ar-active', arEnabled);
-    arButton.classList.toggle('ar-inactive', !arEnabled);
-    arButton.textContent = arEnabled ? '📷 AR Mode' : '📷 Enable AR';
+function updateUI() {
+    document.getElementById('arToggle').classList.toggle('ar-active', arEnabled);
+    document.getElementById('arToggle').classList.toggle('ar-inactive', !arEnabled);
+    document.getElementById('arToggle').textContent = arEnabled ? '📷 AR Mode' : '📷 Enable AR';
+    
+    document.getElementById('gyroToggle').classList.toggle('gyro-active', gyroEnabled);
+    document.getElementById('gyroToggle').classList.toggle('gyro-inactive', !gyroEnabled);
+    document.getElementById('gyroToggle').textContent = gyroEnabled ? '🔄 Gyro On' : '🔄 Gyro Off';
+}
 
-    const gyroButton = document.getElementById('gyroToggle');
-    gyroButton.classList.toggle('gyro-active', gyroEnabled);
-    gyroButton.classList.toggle('gyro-inactive', !gyroEnabled);
-    gyroButton.textContent = gyroEnabled ? '🔄 Gyro On' : '🔄 Gyro Off';
+function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+    
+    if(gyroEnabled) {
+        camera.quaternion.slerp(gyroQuaternion, 0.1);
+        controls.target.set(0, 0, 0);
+    }
+    
+    controls.update();
+    renderer.render(scene, camera);
 }
 
 window.addEventListener('load', init);

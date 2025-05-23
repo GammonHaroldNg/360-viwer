@@ -3,6 +3,7 @@ body {
     overflow: hidden;
     font-family: Arial, sans-serif;
     touch-action: none;
+    background: #000;
 }
 
 #container {
@@ -11,55 +12,55 @@ body {
     height: 100%;
     top: 0;
     left: 0;
-    z-index: 1;
 }
 
 #controls {
     position: fixed;
-    bottom: 10px;
+    bottom: 20px;
     left: 50%;
     transform: translateX(-50%);
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    background: rgba(0, 0, 0, 0.5);
-    padding: 10px 20px;
-    border-radius: 15px;
-    color: white;
+    gap: 10px;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 12px;
+    border-radius: 20px;
     z-index: 1000;
 }
 
 .control-btn {
-    padding: 12px 20px;
+    padding: 10px 20px;
     border: none;
-    border-radius: 8px;
+    border-radius: 10px;
     background: #4285f4;
     color: white;
+    font-size: 14px;
     cursor: pointer;
-    font-size: 16px;
-    transition: all 0.3s ease;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(5px);
 }
 
 .control-btn:hover {
     background: #3367d6;
+    transform: scale(1.05);
 }
 
 #transparencyControl {
     display: flex;
     align-items: center;
-    gap: 10px;
-    width: 90%;
-    max-width: 300px;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 8px 12px;
+    border-radius: 10px;
 }
 
 #opacityControl {
-    width: 200px;
+    width: 120px;
 }
 
 #opacityValue {
     min-width: 40px;
     text-align: center;
+    color: white;
 }
 
 #loading {
@@ -67,40 +68,55 @@ body {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    background: rgba(0, 0, 0, 0.7);
     color: white;
-    padding: 15px 25px;
-    border-radius: 8px;
-    z-index: 2000;
-}
-
-.hidden {
-    display: none !important;
+    font-size: 18px;
+    background: rgba(0, 0, 0, 0.8);
+    padding: 15px 30px;
+    border-radius: 10px;
 }
 
 .gyro-on {
     background: #4CAF50 !important;
-    animation: pulse 2s infinite;
+    box-shadow: 0 0 15px rgba(76, 175, 80, 0.5);
 }
 
 .gyro-off {
-    background: #9E9E9E !important;
-}
-
-@keyframes pulse {
-    0% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7); }
-    70% { box-shadow: 0 0 0 10px rgba(76, 175, 80, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
+    background: #757575 !important;
 }
 
 #cameraContainer {
     position: fixed;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
     z-index: -1;
 }
 
+#cameraContainer video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: scaleX(-1); /* Mirror camera feed */
+}
+
 canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
     touch-action: none;
+    z-index: 1;
+}
+
+@media (max-width: 768px) {
+    #controls {
+        bottom: 10px;
+        padding: 8px;
+        gap: 8px;
+    }
+    
+    .control-btn {
+        padding: 8px 16px;
+        font-size: 13px;
+    }
 }

@@ -104,3 +104,24 @@ body {
     object-fit: cover;
     transform: scaleX(-1);
 }
+
+#controls {
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+#resetView {
+    background: #666;
+}
+
+#resetView:hover {
+    background: #555;
+}
+
+.gyro-on {
+    background: #4CAF50 !important;
+}
+
+.gyro-off {
+    background: #666 !important;
+}

@@ -18,8 +18,8 @@ async function init() {
 function setupScene() {
     scene = new THREE.Scene();
     
-    // Setup groups hierarchy
-    gyroGroup.rotation.x = -Math.PI/2; // Initial horizon view
+    // Initialize gyroGroup to face forward (horizontal view)
+    gyroGroup.rotation.set(0, 0, 0); // Changed from -Math.PI/2
     scene.add(gyroGroup);
     gyroGroup.add(manualGroup);
     
@@ -61,6 +61,7 @@ function setupControls() {
     document.getElementById('resetView').addEventListener('click', () => {
         manualGroup.position.set(0, 0, 0);
         manualGroup.rotation.set(0, 0, 0);
+        gyroGroup.rotation.set(0, 0, 0); // Reset to horizontal view
         controls.reset();
     });
     document.getElementById('opacitySlider').addEventListener('input', e => {
@@ -75,41 +76,39 @@ function setupGyro() {
     window.addEventListener('deviceorientation', event => {
         if(!gyroEnabled || !event.alpha) return;
         
-        // Convert device orientation to Three.js coordinate system
+        // Convert device orientation (now maps directly to horizontal view)
         const alpha = THREE.MathUtils.degToRad(event.alpha);
         const beta = THREE.MathUtils.degToRad(event.beta);
         const gamma = THREE.MathUtils.degToRad(event.gamma);
         
-        // Create quaternion from device orientation
         const quaternion = new THREE.Quaternion()
             .setFromEuler(new THREE.Euler(
-                Math.PI/2 - beta, // Adjust for initial horizon view
+                beta,  // Removed Math.PI/2 adjustment
                 alpha,
                 -gamma,
                 'YXZ'
             ));
         
-        // Smooth rotation transition
         deviceQuaternion.slerp(quaternion, 0.1);
     });
-}
 
-async function toggleAR() {
+    async function toggleAR() {
+// ... (Keep the rest of your existing functions: toggleAR, toggleGyro, updateUI, onWindowResize, animate)
     try {
         arEnabled = !arEnabled;
-        
+
         if(arEnabled) {
             videoStream = await navigator.mediaDevices.getUserMedia({
                 video: { facingMode: 'environment' }
             });
-            
+
             const video = document.createElement('video');
             video.srcObject = videoStream;
             video.playsInline = true;
             video.style.cssText = `position:fixed;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);`;
             document.getElementById('cameraContainer').appendChild(video);
             await video.play();
-            
+
             if(sphere) sphere.material.opacity = 0.8;
             document.getElementById('transparencyControl').classList.remove('hidden');
         } else {
@@ -118,7 +117,7 @@ async function toggleAR() {
             if(sphere) sphere.material.opacity = 1;
             document.getElementById('transparencyControl').classList.add('hidden');
         }
-        
+
         updateUI();
     } catch(error) {
         console.error('AR error:', error);
@@ -128,10 +127,10 @@ async function toggleAR() {
 
 function toggleGyro() {
     if(!isMobile) return;
-    
+
     gyroEnabled = !gyroEnabled;
     controls.enabled = !gyroEnabled;
-    
+
     if(gyroEnabled && typeof DeviceOrientationEvent.requestPermission === 'function') {
         DeviceOrientationEvent.requestPermission()
             .then(permission => {
@@ -139,7 +138,7 @@ function toggleGyro() {
             })
             .catch(console.error);
     }
-    
+
     updateUI();
 }
 
@@ -163,18 +162,18 @@ function onWindowResize() {
 
 function animate() {
     requestAnimationFrame(animate);
-    
+
     if(gyroEnabled) {
         // Apply gyro rotation to gyroGroup
         gyroGroup.quaternion.copy(deviceQuaternion);
-        
+
         // Combine with manual controls
         controls.update();
     } else {
         // Normal controls only
         controls.update();
     }
-    
+
     renderer.render(scene, camera);
 }
 

@@ -19,7 +19,7 @@ function setupScene() {
     scene = new THREE.Scene();
     
     // Initialize gyroGroup to face forward (horizontal view)
-    gyroGroup.rotation.set(0, 0, 0); // Changed from -Math.PI/2
+    gyroGroup.rotation.set(-Math.PI/2, 0, 0); // Tilt down to face horizon
     scene.add(gyroGroup);
     gyroGroup.add(manualGroup);
     
@@ -123,36 +123,30 @@ async function toggleAR() {
         console.error('AR error:', error);
         alert(`Error: ${error.message}`);
     }
-}
-
 function toggleGyro() {
     if (!isMobile) return;
 
-    // Capture the camera's current global orientation
+    // Capture current camera orientation
     const cameraWorldQuaternion = new THREE.Quaternion();
     camera.getWorldQuaternion(cameraWorldQuaternion);
 
     gyroEnabled = !gyroEnabled;
 
     if (gyroEnabled) {
-        // Transfer orientation to gyroGroup
-        gyroGroup.quaternion.copy(cameraWorldQuaternion);
-        // Reset manualGroup
+        // Apply correction quaternion to align with device's forward direction
+        const correction = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI/2, 0, 0));
+        gyroGroup.quaternion.copy(correction.multiply(cameraWorldQuaternion));
         manualGroup.rotation.set(0, 0, 0);
-        manualGroup.position.set(0, 0, 0);
     } else {
-        // Reset gyroGroup
-        gyroGroup.quaternion.identity();
-        // Transfer orientation to manualGroup via Euler angles
+        // Transfer orientation back to manualGroup
         const euler = new THREE.Euler().setFromQuaternion(cameraWorldQuaternion, 'YXZ');
-        manualGroup.rotation.set(euler.x, euler.y, euler.z);
+        manualGroup.rotation.copy(euler);
     }
 
-    // Sync OrbitControls
-    controls.update();
     controls.enabled = !gyroEnabled;
+    controls.update();
 
-    // Handle iOS permissions
+    // iOS permission handling
     if (gyroEnabled && typeof DeviceOrientationEvent.requestPermission === 'function') {
         DeviceOrientationEvent.requestPermission()
             .then(permission => {

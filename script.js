@@ -128,31 +128,32 @@ async function toggleAR() {
 function toggleGyro() {
     if (!isMobile) return;
 
-    gyroEnabled = !gyroEnabled;
-
-    // Capture the current camera orientation
     const cameraWorldQuaternion = new THREE.Quaternion();
     camera.getWorldQuaternion(cameraWorldQuaternion);
 
+    gyroEnabled = !gyroEnabled;
+
     if (gyroEnabled) {
-        // Switch TO gyro mode:
-        // Transfer current orientation to gyroGroup
         gyroGroup.quaternion.copy(cameraWorldQuaternion);
-        // Reset manualGroup to identity
         manualGroup.rotation.set(0, 0, 0);
+        manualGroup.position.set(0, 0, 0);
     } else {
-        // Switch FROM gyro mode:
-        // Transfer current orientation to manualGroup
-        gyroGroup.quaternion.identity(); // Reset gyroGroup
+        gyroGroup.quaternion.identity();
         manualGroup.quaternion.copy(cameraWorldQuaternion);
+        const euler = new THREE.Euler().setFromQuaternion(manualGroup.quaternion, 'YXZ');
+        manualGroup.rotation.set(euler.x, euler.y, euler.z);
     }
 
+    controls.update();
     controls.enabled = !gyroEnabled;
 
     if (gyroEnabled && typeof DeviceOrientationEvent.requestPermission === 'function') {
         DeviceOrientationEvent.requestPermission()
             .then(permission => {
-                if (permission !== 'granted') disableGyro();
+                if (permission !== 'granted') {
+                    gyroEnabled = false;
+                    updateUI();
+                }
             })
             .catch(console.error);
     }

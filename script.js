@@ -123,6 +123,8 @@ async function toggleAR() {
         console.error('AR error:', error);
         alert(`Error: ${error.message}`);
     }
+}
+
 function toggleGyro() {
     if (!isMobile) return;
 

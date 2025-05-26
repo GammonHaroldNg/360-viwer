@@ -91,24 +91,24 @@ function setupGyro() {
         
         deviceQuaternion.slerp(quaternion, 0.1);
     });
+}
 
-    async function toggleAR() {
-// ... (Keep the rest of your existing functions: toggleAR, toggleGyro, updateUI, onWindowResize, animate)
+async function toggleAR() {
     try {
         arEnabled = !arEnabled;
-
+        
         if(arEnabled) {
             videoStream = await navigator.mediaDevices.getUserMedia({
                 video: { facingMode: 'environment' }
             });
-
+            
             const video = document.createElement('video');
             video.srcObject = videoStream;
             video.playsInline = true;
             video.style.cssText = `position:fixed;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);`;
             document.getElementById('cameraContainer').appendChild(video);
             await video.play();
-
+            
             if(sphere) sphere.material.opacity = 0.8;
             document.getElementById('transparencyControl').classList.remove('hidden');
         } else {
@@ -117,7 +117,7 @@ function setupGyro() {
             if(sphere) sphere.material.opacity = 1;
             document.getElementById('transparencyControl').classList.add('hidden');
         }
-
+        
         updateUI();
     } catch(error) {
         console.error('AR error:', error);

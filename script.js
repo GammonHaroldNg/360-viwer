@@ -126,15 +126,33 @@ async function toggleAR() {
 }
 
 function toggleGyro() {
-    if(!isMobile) return;
+    if (!isMobile) return;
 
     gyroEnabled = !gyroEnabled;
+
+    // Capture the current camera orientation
+    const cameraWorldQuaternion = new THREE.Quaternion();
+    camera.getWorldQuaternion(cameraWorldQuaternion);
+
+    if (gyroEnabled) {
+        // Switch TO gyro mode:
+        // Transfer current orientation to gyroGroup
+        gyroGroup.quaternion.copy(cameraWorldQuaternion);
+        // Reset manualGroup to identity
+        manualGroup.rotation.set(0, 0, 0);
+    } else {
+        // Switch FROM gyro mode:
+        // Transfer current orientation to manualGroup
+        gyroGroup.quaternion.identity(); // Reset gyroGroup
+        manualGroup.quaternion.copy(cameraWorldQuaternion);
+    }
+
     controls.enabled = !gyroEnabled;
 
-    if(gyroEnabled && typeof DeviceOrientationEvent.requestPermission === 'function') {
+    if (gyroEnabled && typeof DeviceOrientationEvent.requestPermission === 'function') {
         DeviceOrientationEvent.requestPermission()
             .then(permission => {
-                if(permission !== 'granted') disableGyro();
+                if (permission !== 'granted') disableGyro();
             })
             .catch(console.error);
     }
